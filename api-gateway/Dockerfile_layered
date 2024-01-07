@@ -1,0 +1,28 @@
+# Эта строка указывает базовый образ, который будет использоваться в качестве "builder" этапа
+FROM eclipse-temurin:17.0.4.1_1-jre as builder
+#  Эта строка устанавливает рабочий каталог внутри контейнера на extracted
+WORKDIR extracted
+# Эта строка добавляет JAR-файл(ы) из локальной директории target внутрь контейнера и переименовывает его(их) в app.jar
+ADD target/*.jar app.jar
+# Эта строка выполняет команду внутри контейнера, которая использует утилиту jarmode для извлечения слоев из JAR-файла app.jar.
+RUN java -Djarmode=layertools -jar app.jar extract
+
+# Эта строка начинает новый этап с тем же базовым образом eclipse-temurin:17.0.4.1_1-jre, но без указания имени этапа (таким образом, это новый этап).
+FROM eclipse-temurin:17.0.4.1_1-jre
+# Устанавливает рабочий каталог внутри контейнера на application
+WORKDIR application
+# Копирует файлы из каталога extracted/dependencies внутрь контейнера в текущий каталог
+COPY --from=builder extracted/dependencies/ ./
+# Копирует файлы из каталога extracted/spring-boot-loader внутрь контейнера в текущий каталог
+COPY --from=builder extracted/spring-boot-loader/ ./
+# Копирует файлы из каталога extracted/snapshot-dependencies внутрь контейнера в текущий каталог
+COPY --from=builder extracted/snapshot-dependencies/ ./
+# Копирует файлы из каталога extracted/application внутрь контейнера в текущий каталог
+COPY --from=builder extracted/application/ ./
+# Эта строка указывает, что контейнер будет прослушивать порт 8080
+EXPOSE 8080
+# Эта строка устанавливает точку входа для контейнера, указывая команду, которая будет выполнена при запуске контейнера.
+ENTRYPOINT ["java", "org.springframework.boot.loader.JarLauncher"]
+
+# Таким образом, этот Dockerfile создает два этапа: первый этап извлекает слои из JAR-файла,
+# а второй этап использует эти слои для создания конечного образа с приложением Spring Boot, готовым для выполнения
